@@ -13,6 +13,7 @@ interface Expense {
   id: string
   amount: number
   description: string
+  category: string
   timestamp: number
 }
 
@@ -35,7 +36,12 @@ export default function FinanzasChat() {
     const savedExpenses = localStorage.getItem("expenses")
     if (savedExpenses) {
       const parsed = JSON.parse(savedExpenses)
-      setExpenses(parsed)
+      // Migrar gastos antiguos sin categoría
+      const migratedExpenses = parsed.map((exp: any) => ({
+        ...exp,
+        category: exp.category || "Otros"
+      }))
+      setExpenses(migratedExpenses)
 
       // Crear mensajes iniciales de bienvenida
       setMessages([
@@ -92,7 +98,7 @@ export default function FinanzasChat() {
     return null
   }
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     if (!input.trim()) return
 
@@ -102,36 +108,101 @@ export default function FinanzasChat() {
       content: input,
     }
 
+    setMessages((prev) => [...prev, userMessage])
+    setInput("")
+
+    // Intentar parsear el gasto localmente primero
     const parsedExpense = parseExpense(input)
 
     if (parsedExpense) {
-      const newExpense: Expense = {
-        id: Date.now().toString(),
-        amount: parsedExpense.amount,
-        description: parsedExpense.description,
-        timestamp: Date.now(),
-      }
+      // Llamar a Gemini AI para detectar la categoría y obtener respuesta
+      try {
+        const response = await fetch("/api/chat", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            message: input,
+            expenses: expenses,
+            isExpense: true,
+          }),
+        })
 
-      const assistantMessage: Message = {
-        id: (Date.now() + 1).toString(),
-        type: "assistant",
-        content: `Gasto registrado: S/${parsedExpense.amount.toFixed(2)} en ${parsedExpense.description}`,
-        expense: newExpense,
-      }
+        const data = await response.json()
 
-      setExpenses((prev) => [...prev, newExpense])
-      setMessages((prev) => [...prev, userMessage, assistantMessage])
+        const newExpense: Expense = {
+          id: Date.now().toString(),
+          amount: parsedExpense.amount,
+          description: parsedExpense.description,
+          category: data.category || "Otros",
+          timestamp: Date.now(),
+        }
+
+        setExpenses((prev) => [...prev, newExpense])
+
+        const assistantMessage: Message = {
+          id: (Date.now() + 1).toString(),
+          type: "assistant",
+          content: data.response || `Gasto registrado: S/${parsedExpense.amount.toFixed(2)} en ${parsedExpense.description} (${data.category || "Otros"})`,
+          expense: newExpense,
+        }
+
+        setMessages((prev) => [...prev, assistantMessage])
+      } catch (error) {
+        console.error("Error al llamar a Gemini AI:", error)
+        const newExpense: Expense = {
+          id: Date.now().toString(),
+          amount: parsedExpense.amount,
+          description: parsedExpense.description,
+          category: "Otros",
+          timestamp: Date.now(),
+        }
+
+        setExpenses((prev) => [...prev, newExpense])
+
+        const assistantMessage: Message = {
+          id: (Date.now() + 1).toString(),
+          type: "assistant",
+          content: `Gasto registrado: S/${parsedExpense.amount.toFixed(2)} en ${parsedExpense.description}`,
+          expense: newExpense,
+        }
+        setMessages((prev) => [...prev, assistantMessage])
+      }
     } else {
-      const assistantMessage: Message = {
-        id: (Date.now() + 1).toString(),
-        type: "assistant",
-        content:
-          'No pude entender ese gasto. Intenta escribir algo como "Gasté 10 soles en taxi" o "15 soles en almuerzo".',
-      }
-      setMessages((prev) => [...prev, userMessage, assistantMessage])
-    }
+      // Si no es un gasto, consultar a Gemini AI
+      try {
+        const response = await fetch("/api/chat", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            message: input,
+            expenses: expenses,
+          }),
+        })
 
-    setInput("")
+        const data = await response.json()
+
+        const assistantMessage: Message = {
+          id: (Date.now() + 1).toString(),
+          type: "assistant",
+          content: data.response || 'No pude entender ese gasto. Intenta escribir algo como "Gasté 10 soles en taxi" o "15 soles en almuerzo".',
+        }
+
+        setMessages((prev) => [...prev, assistantMessage])
+      } catch (error) {
+        console.error("Error al llamar a Gemini AI:", error)
+        const assistantMessage: Message = {
+          id: (Date.now() + 1).toString(),
+          type: "assistant",
+          content:
+            'No pude entender ese gasto. Intenta escribir algo como "Gasté 10 soles en taxi" o "15 soles en almuerzo".',
+        }
+        setMessages((prev) => [...prev, assistantMessage])
+      }
+    }
   }
 
   return (

@@ -22,6 +22,44 @@ Continue building your app on:
 
 **[https://v0.app/chat/projects/UqltBfUhOxG](https://v0.app/chat/projects/UqltBfUhOxG)**
 
+## Configuración de Gemini AI
+
+Esta aplicación usa Google Gemini AI para proporcionar respuestas inteligentes en el chat de finanzas.
+
+### Paso 1: Obtener API Key
+
+1. Ve a [Google AI Studio](https://makersuite.google.com/app/apikey)
+2. Inicia sesión con tu cuenta de Google
+3. Crea una nueva API key
+4. Copia la API key generada
+
+### Paso 2: Configurar Variables de Entorno
+
+1. Copia el archivo `.env.example` a `.env.local`:
+   ```bash
+   copy .env.example .env.local
+   ```
+
+2. Abre `.env.local` y reemplaza `tu_api_key_aqui` con tu API key de Gemini:
+   ```
+   GEMINI_API_KEY=tu_api_key_real_aqui
+   ```
+
+### Paso 3: Ejecutar la Aplicación
+
+```bash
+npm run dev
+```
+
+La aplicación estará disponible en `http://localhost:3000`
+
+## Características
+
+- 💬 Chat inteligente con Gemini AI
+- 💰 Registro automático de gastos
+- 📊 Reportes de gastos
+- 🎨 Interfaz moderna con Next.js y Tailwind CSS
+
 ## How It Works
 
 1. Create and modify your project using [v0.app](https://v0.app)
